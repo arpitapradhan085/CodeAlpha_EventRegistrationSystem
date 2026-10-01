@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Event Registration Portal</title>
+<style>
+  :root {
+    --bg: #f7f8fc; --card: #ffffff; --ink: #201f2b; --muted: #716f80;
+    --accent: #4338ca; --accent-dark: #362da3; --line: #e6e5f0; --ok: #1f8a4c; --warn: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:20px 28px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:1.4rem; letter-spacing:0.3px; }
+  header p { margin:4px 0 0; opacity:0.85; font-size:0.85rem; }
+  header .actions { display:flex; gap:8px; align-items:center; }
+  header button.ghostbtn { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; white-space:nowrap; }
+  nav { display:flex; gap:4px; padding:0 28px; background:#fff; border-bottom:1px solid var(--line); overflow-x:auto; }
+  nav button { border:none; background:none; padding:14px 16px; font-size:0.9rem; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; white-space:nowrap; }
+  nav button.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  main { max-width:1000px; margin:0 auto; padding:24px 28px 60px; }
+  section { display:none; }
+  section.active { display:block; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:16px; }
+  h2 { font-size:1.05rem; margin:0 0 14px; }
+  table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.4px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:14px; }
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field label { font-size:0.75rem; color:var(--muted); }
+  input, select, textarea { padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:0.88rem; min-width:110px; font-family:inherit; }
+  textarea { min-width:100%; resize:vertical; }
+  button.action { background:var(--accent); color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem; }
+  button.action:hover { background:var(--accent-dark); }
+  button.action:disabled { background:#b7b4d6; cursor:not-allowed; }
+  button.ghost { background:none; border:1px solid var(--line); padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.78rem; color:var(--muted); margin-right:4px; }
+  button.ghost.danger { color:#b3261e; border-color:#f3d3d0; }
+  button.ghost.danger:hover { background:#fbe9e7; }
+  .badge { padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:600; }
+  .badge.confirmed { background:#e4f6ea; color:var(--ok); }
+  .badge.cancelled { background:#fbe9e7; color:#b3261e; }
+  .badge.full { background:#fdf0dc; color:var(--warn); }
+  .badge.open { background:#e9e8fb; color:var(--accent); }
+  .msg { font-size:0.82rem; margin-top:8px; }
+  .msg.err { color:#b3261e; }
+  .msg.ok { color:var(--ok); }
+  .event-card { border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:12px; }
+  .event-card h3 { margin:0 0 4px; font-size:1.02rem; }
+  .event-meta { font-size:0.82rem; color:var(--muted); margin-bottom:6px; }
+  .event-desc { font-size:0.85rem; color:#444; margin-bottom:10px; }
+  .event-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .stat { display:inline-block; margin-right:24px; }
+  .stat b { display:block; font-size:1.4rem; color:var(--accent); }
+  .stat span { font-size:0.78rem; color:var(--muted); }
+  .category-pill { display:inline-block; background:#eeeafc; color:var(--accent); border-radius:12px; padding:2px 9px; font-size:0.72rem; font-weight:600; text-transform:capitalize; margin-right:6px; }
+
+  #login-screen { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:100; }
+  #login-screen .box { background:#fff; border:1px solid var(--line); border-radius:12px; padding:28px; width:90%; max-width:340px; text-align:center; }
+  #login-screen h2 { margin-top:0; }
+  #login-screen input { width:100%; margin-bottom:10px; }
+  #login-screen button { width:100%; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" style="display:none">
+  <div class="box">
+    <h2>🔒 Organizer Login</h2>
+    <p style="font-size:0.85rem;color:var(--muted)">Enter the organizer key to manage events.</p>
+    <input id="login-key" type="password" placeholder="Organizer key" onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="action" onclick="doLogin()">Enter</button>
+    <div id="login-msg" class="msg err"></div>
+    <button class="ghost" style="margin-top:10px;width:100%" onclick="closeLogin()">Cancel</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>🎟 Event Registration Portal</h1>
+    <p>Browse events · Register · Manage your spot</p>
+  </div>
+  <div class="actions">
+    <span id="organizer-badge" style="display:none;font-size:0.8rem;opacity:0.9">Organizer mode</span>
+    <button class="ghostbtn" id="organizer-btn" onclick="openLogin()">Organizer Login</button>
+  </div>
+</header>
+
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+const API = "/api";
+const publicTabs = ["events", "my-registrations"];
+const adminTabs = ["manage", "attendees", "reports"];
+let tabs = [...publicTabs];
+const nav = document.getElementById("nav");
+const main = document.getElementById("main");
+const tabLabels = {
+  "events": "Browse Events",
+  "my-registrations": "My Registrations",
+  "manage": "Manage Events",
+  "attendees": "Attendees",
+  "reports": "Reports",
+};
+
+function getKey() { return localStorage.getItem("organizerKey") || ""; }
+
+function openLogin() {
+  if (getKey()) { logout(); return; }
+  document.getElementById("login-screen").style.display = "flex";
+}
+function closeLogin() {
+  document.getElementById("login-screen").style.display = "none";
+}
+async function doLogin() {
+  const key = document.getElementById("login-key").value;
+  const msg = document.getElementById("login-msg");
+  try {
+    const res = await fetch(API + "/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    if (!res.ok) throw new Error("Incorrect organizer key");
+    localStorage.setItem("organizerKey", key);
+    closeLogin();
+    enterOrganizerMode();
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+function logout() {
+  localStorage.removeItem("organizerKey");
+  tabs = [...publicTabs];
+  document.getElementById("organizer-badge").style.display = "none";
+  document.getElementById("organizer-btn").textContent = "Organizer Login";
+  buildNav();
+  showTab("events");
+}
+function enterOrganizerMode() {
+  tabs = [...publicTabs, ...adminTabs];
+  document.getElementById("organizer-badge").style.display = "inline";
+  document.getElementById("organizer-btn").textContent = "Log out";
+  buildNav();
+  showTab("manage");
+}
+
+document.getElementById("organizer-btn").onclick = () => {
+  if (getKey()) { logout(); } else { openLogin(); }
+};
+
+function buildNav() {
+  nav.innerHTML = "";
+  main.innerHTML = "";
+  tabs.forEach((t) => {
+    const btn = document.createElement("button");
+    btn.textContent = tabLabels[t];
+    btn.onclick = () => showTab(t);
+    btn.id = "nav-" + t;
+    nav.appendChild(btn);
+  });
+  tabs.forEach(t => {
+    const s = document.createElement("section");
+    s.id = "tab-" + t;
+    main.appendChild(s);
+  });
+}
+
+function showTab(t) {
+  tabs.forEach(x => {
+    document.getElementById("nav-" + x).classList.toggle("active", x === t);
+    document.getElementById("tab-" + x).classList.toggle("active", x === t);
+  });
+  render[t]();
+}
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (getKey()) headers["X-Admin-Key"] = getKey();
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) {
+    logout();
+    throw new Error("Session expired — please log in again.");
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso.replace(" ", "T"));
+  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+const render = {};
+
+// ---------------- BROWSE EVENTS (public) ----------------
+render.events = async function () {
+  const el = document.getElementById("tab-events");
+  const events = await api("/events?upcoming=true");
+  el.innerHTML = `
+    <div class="card">
+      <h2>Upcoming Events</h2>
+      ${events.map(e => `
+        <div class="event-card">
+          <span class="category-pill">${e.category}</span>
+          ${e.is_full ? '<span class="badge full">Full</span>' : '<span class="badge open">Open</span>'}
+          <h3>${e.title}</h3>
+          <div class="event-meta">📍 ${e.location || "TBA"} &nbsp;·&nbsp; 🗓 ${fmtDate(e.event_date)}</div>
+          <div class="event-desc">${e.description || ""}</div>
+          <div class="event-footer">
+            <span style="font-size:0.82rem;color:var(--muted)">${e.registered_count} / ${e.capacity} registered</span>
+            <button class="action" ${e.is_full ? "disabled" : ""} onclick="openRegisterForm(${e.id}, '${e.title.replace(/'/g, "\\'")}')">
+              ${e.is_full ? "Full" : "Register"}
+            </button>
+          </div>
+          <div id="reg-form-${e.id}"></div>
+        </div>`).join("") || "<p style='color:var(--muted)'>No upcoming events right now.</p>"}
+    </div>`;
+};
+
+window.openRegisterForm = function (eventId, title) {
+  const container = document.getElementById(`reg-form-${eventId}`);
+  if (container.innerHTML) { container.innerHTML = ""; return; }
+  container.innerHTML = `
+    <div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="field"><label>Name</label><input id="reg-name-${eventId}"></div>
+      <div class="field"><label>Email</label><input id="reg-email-${eventId}" type="email"></div>
+      <div class="field"><label>Phone (optional)</label><input id="reg-phone-${eventId}"></div>
+      <button class="action" onclick="submitRegistration(${eventId})">Confirm Registration</button>
+    </div>
+    <div id="reg-msg-${eventId}" class="msg"></div>`;
+};
+
+window.submitRegistration = async function (eventId) {
+  const msg = document.getElementById(`reg-msg-${eventId}`);
+  try {
+    await api("/registrations", { method: "POST", body: JSON.stringify({
+      event_id: eventId,
+      name: document.getElementById(`reg-name-${eventId}`).value,
+      email: document.getElementById(`reg-email-${eventId}`).value,
+      phone: document.getElementById(`reg-phone-${eventId}`).value,
+    })});
+    msg.textContent = "You're registered! 🎉";
+    msg.className = "msg ok";
+    setTimeout(() => render.events(), 900);
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.className = "msg err";
+  }
+};
+
+// ---------------- MY REGISTRATIONS (public, lookup by email) ----------------
+render["my-registrations"] = async function () {
+  const el = document.getElementById("tab-my-registrations");
+  el.innerHTML = `
+    <div class="card">
+      <h2>Find Your Registrations</h2>
+      <div class="row">
+        <div class="field"><label>Email</label><input id="lookup-email" type="email" placeholder="you@example.com"></div>
+        <button class="action" onclick="lookupRegistrations()">Find</button>
+      </div>
+      <div id="lookup-results"></div>
+    </div>`;
+};
+
+window.lookupRegistrations = async function () {
+  const email = document.getElementById("lookup-email").value.trim();
+  const results = document.getElementById("lookup-results");
+  if (!email) { results.innerHTML = `<div class="msg err">Enter your email first.</div>`; return; }
+  try {
+    const regs = await api(`/registrations?email=${encodeURIComponent(email)}`);
+    if (!regs.length) {
+      results.innerHTML = `<p style="color:var(--muted)">No registrations found for that email.</p>`;
+      return;
+    }
+    results.innerHTML = `
+      <table style="margin-top:14px">
+        <tr><th>Event</th><th>Date</th><th>Status</th><th></th></tr>
+        ${regs.map(r => `
+          <tr>
+            <td>${r.event_title}</td>
+            <td>${fmtDate(r.event_date)}</td>
+            <td>${badge(r.status)}</td>
+            <td>${r.status === "confirmed" ? `<button class="ghost danger" onclick="cancelMyRegistration(${r.id}, '${email.replace(/'/g, "\\'")}')">Cancel</button>` : ""}</td>
+          </tr>`).join("")}
+      </table>`;
+  } catch (e) {
+    results.innerHTML = `<div class="msg err">${e.message}</div>`;
+  }
+};
+
+window.cancelMyRegistration = async function (regId, email) {
+  if (!confirm("Cancel this registration?")) return;
+  try {
+    await api(`/registrations/${regId}/cancel`, { method: "PUT", body: JSON.stringify({ email }) });
+    lookupRegistrations();
+  } catch (e) { alert(e.message); }
+};
+
+function badge(status) {
+  return `<span class="badge ${status}">${status}</span>`;
+}
+
+// ---------------- MANAGE EVENTS (organizer) ----------------
+render.manage = async function () {
+  const el = document.getElementById("tab-manage");
+  const events = await api("/events");
+  el.innerHTML = `
+    <div class="card">
+      <h2>Create Event</h2>
+      <div class="row">
+        <div class="field"><label>Title</label><input id="ev-title"></div>
+        <div class="field"><label>Category</label><input id="ev-cat" value="general"></div>
+        <div class="field"><label>Location</label><input id="ev-loc"></div>
+        <div class="field"><label>Date & time</label><input id="ev-date" type="datetime-local"></div>
+        <div class="field"><label>Capacity</label><input id="ev-cap" type="number" value="50"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1"><label>Description</label><textarea id="ev-desc" rows="2"></textarea></div>
+      </div>
+      <button class="action" onclick="createEvent()">Create Event</button>
+      <div id="ev-msg" class="msg"></div>
+    </div>
+    <div class="card">
+      <h2>All Events (${events.length})</h2>
+      <table>
+        <tr><th>Title</th><th>Date</th><th>Capacity</th><th>Registered</th><th></th></tr>
+        ${events.map(e => `
+          <tr>
+            <td>${e.title}<div class="event-meta">${e.category} · ${e.location || "TBA"}</div></td>
+            <td>${fmtDate(e.event_date)}</td>
+            <td>${e.capacity}</td>
+            <td>${e.registered_count}${e.is_full ? " (full)" : ""}</td>
+            <td><button class="ghost danger" onclick="deleteEvent(${e.id}, '${e.title.replace(/'/g, "\\'")}')">Delete</button></td>
+          </tr>`).join("")}
+      </table>
+    </div>`;
+};
+
+window.createEvent = async function () {
+  const msg = document.getElementById("ev-msg");
+  try {
+    const dt = document.getElementById("ev-date").value;
+    await api("/events", { method: "POST", body: JSON.stringify({
+      title: document.getElementById("ev-title").value,
+      category: document.getElementById("ev-cat").value,
+      location: document.getElementById("ev-loc").value,
+      event_date: dt ? dt.replace("T", " ") + ":00" : "",
+      capacity: parseInt(document.getElementById("ev-cap").value),
+      description: document.getElementById("ev-desc").value,
+    })});
+    render.manage();
+  } catch (e) { msg.textContent = e.message; msg.className = "msg err"; }
+};
+
+window.deleteEvent = async function (id, title) {
+  if (!confirm(`Delete "${title}" permanently? This also removes its registrations.`)) return;
+  try {
+    await api(`/events/${id}`, { method: "DELETE" });
+    render.manage();
+  } catch (e) { alert(e.message); }
+};
+
+// ---------------- ATTENDEES (organizer) ----------------
+render.attendees = async function () {
+  const el = document.getElementById("tab-attendees");
+  const events = await api("/events");
+  el.innerHTML = `
+    <div class="card">
+      <h2>View Attendees</h2>
+      <div class="row">
+        <div class="field"><label>Event</label>
+          <select id="att-event">${events.map(e => `<option value="${e.id}">${e.title}</option>`).join("")}</select>
+        </div>
+        <button class="action" onclick="loadAttendees()">Load</button>
+      </div>
+      <div id="att-results"></div>
+    </div>`;
+  if (events.length) loadAttendees();
+};
+
+window.loadAttendees = async function () {
+  const eventId = document.getElementById("att-event").value;
+  const results = document.getElementById("att-results");
+  try {
+    const regs = await api(`/events/${eventId}/registrations`);
+    results.innerHTML = `
+      <table style="margin-top:14px">
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Registered</th></tr>
+        ${regs.map(r => `
+          <tr>
+            <td>${r.name}</td><td>${r.email}</td><td>${r.phone || "—"}</td>
+            <td>${badge(r.status)}</td>
+            <td>${new Date(r.registered_at.replace(" ", "T") + "Z").toLocaleDateString()}</td>
+          </tr>`).join("") || "<tr><td colspan=5>No registrations yet.</td></tr>"}
+      </table>`;
+  } catch (e) {
+    results.innerHTML = `<div class="msg err">${e.message}</div>`;
+  }
+};
+
+// ---------------- REPORTS (organizer) ----------------
+render.reports = async function () {
+  const el = document.getElementById("tab-reports");
+  const summary = await api("/reports/summary");
+  el.innerHTML = `
+    <div class="card">
+      <h2>Overview</h2>
+      <div class="stat"><b>${summary.total_events}</b><span>Total events</span></div>
+      <div class="stat"><b>${summary.total_registrations}</b><span>Total registrations</span></div>
+    </div>
+    <div class="card">
+      <h2>By Event</h2>
+      <table>
+        <tr><th>Event</th><th>Date</th><th>Registered</th><th>Capacity</th><th>Fill Rate</th></tr>
+        ${summary.events.map(e => `
+          <tr>
+            <td>${e.title}</td>
+            <td>${fmtDate(e.event_date)}</td>
+            <td>${e.registered_count}</td>
+            <td>${e.capacity}</td>
+            <td>${Math.round((e.registered_count / e.capacity) * 100)}%</td>
+          </tr>`).join("")}
+      </table>
+    </div>`;
+};
+
+// ---------------- init ----------------
+buildNav();
+if (getKey()) { enterOrganizerMode(); } else { showTab("events"); }
+</script>
+</body>
+</html>
