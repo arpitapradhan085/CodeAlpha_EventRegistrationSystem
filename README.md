@@ -1,106 +1,85 @@
-# CodeAlpha_EventRegistrationSystem
+# Simple URL Shortener — CodeAlpha Task 1
 
-A backend for browsing events, registering, and managing your own
-registrations — built with **Flask** and **SQLite**. Includes a public
-event site plus an organizer panel (behind a login) for creating events
-and viewing attendees.
+A minimal backend URL shortener built with **Flask** and **SQLite**, matching every requirement in the task brief.
 
-## Features (per task brief)
+## How it maps to the task checklist
 
-- **Backend**: Flask (Python) managing routes and logic.
-- **Database models**: events, attendees, and registrations (linking
-  attendees to events, with a status of confirmed/cancelled).
-- **APIs**: view event list, event details, and submit registration forms.
-- **Registration management**: attendees can view and cancel their own
-  registrations by email — no account needed.
-- **Optional extras implemented**: an organizer login (shared key) that
-  gates event creation/editing/deletion and the attendee/reports views,
-  plus a small admin panel for all of that.
+| Requirement | Where it's implemented |
+|---|---|
+| Backend server using Flask | `app.py` |
+| API endpoint to accept long URLs + generate a short code | `POST /api/shorten` |
+| Store mapping in a database | SQLite table `urls` (created automatically) |
+| Redirect route | `GET /<short_code>` |
+| Optional frontend | `templates/index.html`, served at `/` |
+
+Bonus (not required, but included): `GET /api/stats/<short_code>` returns click count and creation time.
+
+## Step-by-step: how it works
+
+1. **Database (SQLite)** — `init_db()` creates a `urls` table with columns:
+   `id, short_code, original_url, clicks, created_at`. It runs automatically the first time you start the app.
+
+2. **Shortening a URL** — When you `POST` a URL to `/api/shorten`:
+   - The URL is validated (must start with `http://` or `https://`).
+   - If that exact URL was shortened before, the existing code is reused.
+   - Otherwise, a random 6-character alphanumeric code is generated (`generate_short_code`), checked for uniqueness against the database, and saved.
+   - The endpoint returns the short code, the full short URL, and the original URL as JSON.
+
+3. **Redirecting** — When someone visits `/<short_code>`:
+   - The app looks up `short_code` in the database.
+   - If found, it increments the click counter and issues an HTTP redirect (302) to the original URL.
+   - If not found, it returns a 404 JSON error.
+
+4. **Frontend** — `/` serves a simple HTML page with a text box and button. It calls the `/api/shorten` API with `fetch()` and displays the resulting short link, which you can click directly.
+
+## How to run it
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Run the app
+python app.py
+
+# 3. Open in your browser
+http://127.0.0.1:5000/
+```
+
+The database file `urls.db` will be created automatically in the project folder on first run.
+
+## Trying the API directly (without the frontend)
+
+```bash
+# Shorten a URL
+curl -X POST http://127.0.0.1:5000/api/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.example.com/some/very/long/path"}'
+
+# Response:
+# {"short_code": "aB3xY9", "short_url": "http://127.0.0.1:5000/aB3xY9", "original_url": "..."}
+
+# Visit the short URL (redirects to the original)
+curl -L http://127.0.0.1:5000/aB3xY9
+
+# Check click stats
+curl http://127.0.0.1:5000/api/stats/aB3xY9
+```
 
 ## Project structure
 
 ```
-event-registration-system/
-├── app.py           # Flask app: all API routes
-├── database.py       # Schema + seed data (SQLite)
-├── requirements.txt
-├── static/
-│   └── index.html    # Public site + organizer panel (served at /)
-└── events.db          # created automatically on first run
+url_shortener/
+├── app.py              # Flask backend (routes, DB logic, short-code generation)
+├── templates/
+│   └── index.html      # Basic frontend
+├── requirements.txt    # Python dependencies
+├── urls.db             # SQLite database (auto-created on first run)
+└── README.md
 ```
 
-## Setup
+## For your CodeAlpha submission
 
-```bash
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python app.py
-```
-
-The server starts at **http://localhost:5000**.
-- Visit `/` to browse events and register.
-- Hit `/api/...` for the JSON API directly.
-
-Five sample events and one sample registration are seeded automatically
-the first time you run `python app.py`.
-
-## Organizer login
-
-Creating/editing/deleting events and viewing attendee lists is behind a
-shared key, checked against the `X-Admin-Key` header.
-
-- **Default key:** `letmein`
-- **Change it** with an environment variable before starting the server:
-  ```bash
-  export ADMIN_KEY="something-only-organizers-know"
-  python app.py
-  ```
-- Click **Organizer Login** in the site header to unlock the Manage
-  Events, Attendees, and Reports tabs. Browsing and registering for
-  events never requires this key — that's open to everyone.
-
-## API reference
-
-### Events
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/events` | List events (`?category=`, `?upcoming=true`) — includes `registered_count`, `spots_left`, `is_full` |
-| GET | `/api/events/<id>` | One event's details with the same counts |
-| POST | `/api/events` 🔒 | Create — `{title, event_date, capacity, description?, location?, category?}` |
-| PUT | `/api/events/<id>` 🔒 | Update any field |
-| DELETE | `/api/events/<id>` 🔒 | Delete event (and its registrations) |
-| GET | `/api/events/<id>/registrations` 🔒 | Full attendee list for one event |
-
-### Registrations
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/registrations` | `{event_id, name, email, phone?}` — creates the attendee if new, blocks duplicates and over-capacity signups |
-| GET | `/api/registrations?email=` | Look up your own registrations |
-| PUT | `/api/registrations/<id>/cancel` | `{email}` — cancel your own registration (email must match) |
-| DELETE | `/api/registrations/<id>` 🔒 | Organizer hard-delete |
-
-### Reports
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/reports/summary` 🔒 | Total events/registrations, and a per-event breakdown with fill rate |
-
-🔒 = requires the `X-Admin-Key` header.
-
-## Example: registering for an event
-
-```bash
-curl -X POST http://localhost:5000/api/registrations \
-  -H "Content-Type: application/json" \
-  -d '{"event_id": 1, "name": "Alex Kim", "email": "alex@example.com"}'
-```
-
-If the event is full or you're already registered, the API returns `409`
-with a clear message.
-
-## Notes
-
-- SQLite keeps this dependency-free and easy to demo.
-- Registrations are matched to attendees by email — no passwords, no
-  accounts. Cancelling requires the same email used to register (or the
-  organizer key), which is a lightweight-but-real ownership check.
+1. `git init` this folder, commit, and push it to GitHub as `CodeAlpha_SimpleURLShortener` (or similar naming per instructions).
+2. Record a short video walking through: starting the server, shortening a URL, and clicking the resulting short link to show the redirect.
+3. Post on LinkedIn tagging **@CodeAlpha** with the GitHub link.
+4. Submit via the CodeAlpha submission form.
